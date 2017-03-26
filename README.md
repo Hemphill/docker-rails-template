@@ -7,66 +7,42 @@ This template is based on the tutorial [Quickstart: Compose and Rails](https://d
 1. Duplicate this template directory and rename it as appropriate for your project.
 2. Change the ruby version identified in this template's `Dockerfile` to the version desired.
 3. Change the rails version identified in this template's `Gemfile` to the version desired.
-4. Change the docker-compose.yml `environment` settings `MYSQL_*` to your desired values. Note that the `MYSQL_DATABASE` database will be created when the db image is first built. 
-5. Run the following command which will create the docker container, install the minimal gems necessary to create a rails app, then actually create the rails app:
-   
+4. Modify existing `config/database.yml` for the `development` and `test` environments. Change the `host` values to `db` (the name of the docker-compose db service). Be sure to use `root` as the database `username`. The `config/database.yml` for the `development` and `test` environments should look like the following.
+
+    ```yaml
+    default: &default
+      adapter: mysql2
+      encoding: utf8
+      pool: 5
+      username: root
+      password: password
+      host: db
+    ``` 
+5. Run the following command which will create the docker container, install the minimal gems necessary to create a rails app, then actually create the rails app: 
+
    ```bash
    $ docker-compose run web rails new . --force --database=mysql --skip-bundle
    ```
-6. Run the following command to rebuild the image with the new gems.  You should re-run this command any time you change the Gemfile.
-   
+6. Run the following command to rebuild the image with the new gems.  You should re-run this command any time you change the Gemfile.   
+
    ```bash
    $ docker-compose build
    ```
 7. Replace the generated `config/database.yml` with the `config/sample_database.yml` file from this template.  Be sure to change the `database` names for each environment to match up with the values in the docker-compose.yml file.
 8. Run the following command to start the rails instance.
-   
+
    ```bash
    $ docker-compose up
    ```
-9. Before opening the app in the browser, create the test database in a separate terminal as follows. Note that the db service must already be running (`docker-compose up db`):
+   
+9. Before opening the app in the browser, create the development & test database by running:  
 
    ```bash
-   $ docker-compose run --rm db mysql -h db -u root -p
-   
-   Enter password: 
-   Welcome to the MySQL monitor.  Commands end with ; or \g.
-   Your MySQL connection id is 40
-   Server version: 5.5.54 MySQL Community Server (GPL)
-
-   mysql> show databases;
-   +--------------------+
-   | Database           |
-   +--------------------+
-   | information_schema |
-   | myapp_development  |
-   | mysql              |
-   | performance_schema |
-   +--------------------+
-   4 rows in set (0.00 sec)
-
-   mysql> create database core_test;
-   Query OK, 1 row affected (0.00 sec)
-
-   mysql> grant all privileges on core_test.* to rails@"%";
-   Query OK, 0 rows affected (0.00 sec)
-
-
-   mysql> show databases;
-   +--------------------+
-   | Database           |
-   +--------------------+
-   | information_schema |
-   | myapp_development  |
-   | myapp_test         |
-   | mysql              |
-   | performance_schema |
-   +--------------------+
-   5 rows in set (0.00 sec)
+   docker-compose run --rm web rake db:setup
    ```
    
-10. Verify database connection works from rails console:
-    
+10. Verify database connection works from rails console: 
+   
     ```
     docker-compose run --rm web rails c
     
@@ -75,56 +51,71 @@ This template is based on the tutorial [Quickstart: Compose and Rails](https://d
     irb(main):001:0> ActiveRecord::Base.establish_connection
     
     => #<ActiveRecord::ConnectionAdapters::ConnectionPool:0x005593520f6460 @mon_owner=nil, @mon_count=0, @mon_mutex=#<Thread::Mutex:0x005593520f63e8>, @spec=#<ActiveRecord::ConnectionAdapters::ConnectionSpecification:0x005593520f8f08 @config={:adapter=>"mysql2", :database=>"core_development", :pool=>5, :username=>"rails", :password=>"password", :host=>"db"}, @adapter_method="mysql2_connection">, @checkout_timeout=5, @reaper=#<ActiveRecord::ConnectionAdapters::ConnectionPool::Reaper:0x005593520f6370 @pool=#<ActiveRecord::ConnectionAdapters::ConnectionPool:0x005593520f6460 ...>, @frequency=nil>, @size=5, @reserved_connections=#<ThreadSafe::Cache:0x005593520f62d0 @backend={}, @default_proc=nil>, @connections=[], @automatic_reconnect=true, @available=#<ActiveRecord::ConnectionAdapters::ConnectionPool::Queue:0x005593520f6118 @lock=#<ActiveRecord::ConnectionAdapters::ConnectionPool:0x005593520f6460 ...>, @cond=#<MonitorMixin::ConditionVariable:0x005593520f6000 @monitor=#<ActiveRecord::ConnectionAdapters::ConnectionPool:0x005593520f6460 ...>, @cond=#<Thread::ConditionVariable:0x005593520f5e48>>, @num_waiting=0, @queue=[]>>
-    ```
+    ```  
     
-    If you get an error stating that the mysql2 gem is missing (even tho it is not) then you may be using a version of rails 3 or 4 that has a bug.  Try changing the Gemfile with the following line:
-   
+    If you get an error stating that the mysql2 gem is missing (even tho it is not) then you may be using a version of rails 3 or 4 that has a bug.  Try changing the Gemfile with the following line: 
+     
    ```ruby
    gem 'mysql2', '0.3.20'
    ```
-   
 11. Open the app in your web browser: http://localhost:3000/
 12. To stop the rails server, hit ctrl-c.
 
 
 ## How to update an existing rails app to use this template
 
-1. Copy docker-compose.yml and Dockerfile over from template to your project.
-2. Change the Dockerfile ruby version as desired.
-3. Change the docker-compose.yml `environment` settings `MYSQL_*` to your desired values. Note that the `MYSQL_DATABASE` database will be created when the db image is first built.
-4. Run the following command to rebuild the image with the new gems.  You should re-run this command any time you change the Gemfile.
-   
+1. Copy `docker-compose.yml` and `Dockerfile` over from this template to your project.
+2. Change the `Dockerfile` Ruby version as desired.
+3. Change the `docker-compose.yml` `environment` settings `MYSQL_*` to your desired values. Note that the `MYSQL_DATABASE` database will be created when the db image is first built.
+
+4. Modify existing `config/database.yml` for the `development` and `test` environments. Change the `host` values to `db` (the name of the docker-compose db service). Be sure to use `root` as the database `username`. The `config/database.yml` for the `development` and `test` environments should look like the following.
+
+    ```yaml
+    default: &default
+      adapter: mysql2
+      encoding: utf8
+      pool: 5
+      username: root
+      password: password
+      host: db
+``` 
+
+5. Run the following command to rebuild the image with the new gems.  You should re-run this command any time you change the `Gemfile`.
+
    ```bash
    $ docker-compose build
    ```
-5. Create the test db as shown above in step 9 above.
-6. Modify existing config/database.yml changing the 'host' values to "db" (the name of the docker-compose db service)
+6. Before opening the app in the browser, create the development & test database by running:  
+
+   ```bash
+   docker-compose run --rm web rake db:setup
+   ```
+   
 7. Copy database data from your old db to the new docker db.
    1. Create an mysql dump of your database from your old mysql instance (alternatively, Sequel Pro can do this).  The dump file should be in SQL format and contain both schema and content.
-      
+   
       ```
       $ docker-compose run --rm db mysqldump -h hostname -u rails -p --result-file=/myapp/dump.sql database_name
       ```
+      
       This command will connect to the database at `hostname` with user `rails` and create a `dump.sql` file in the current project directory.  It will prompt for the password.
    2. Copy this dump file to your project dir which is shared with the docker container.
    3. Make sure that the docker-compose 'db' service is running first: 
-      
+   
       ```bash
       $ docker-compose up db
       ```
-   4. Import the dump file into the docker db:
-      
+   4. Import the dump file into the docker db:  
+   
       ```bash
       $ docker-compose run --rm db mysql -h db -u root --password=password development < development.sql
       ```
       Note that the password must be specified in the command since the development.yml file is being redirected to stdin for the import.
-
 8. Verify that database looks good from rails console:
 
     ```
     docker-compose run --rm web rails c
     ```
-
 9. Start the rails app:
 
     ```
@@ -151,7 +142,7 @@ This template is based on the tutorial [Quickstart: Compose and Rails](https://d
 
 RubyMine starting with verison 2017.1 can work well with a Rails project that has been setup using the above instructions.  The following shows you how to configure the project to work within RubyMine.
 
-First, we will setup a static IP for your laptop that can always be accessed from the container regardless of what wifi network you are currently connected to.  This avoids issues with dynamic IPs and the host IP specified in your project's 'config/database.yml' file.
+First, we will setup a static IP for your laptop that can always be accessed from the container regardless of what wifi network you are currently connected to.  This avoids issues with dynamic IPs and the host IP specified in your project's `config/database.yml` file.
 
 Then, we will setup a RubyMine with a Docker deployment, deployment runtime configuration, and a remote Ruby SDK for Docker.
 
@@ -164,7 +155,6 @@ $ docker-compose stop
 ### Configure Static IP
 
 1. Execute the following on the command line in order to associate '192.168.111.111' with your laptop's loopback interface.
-   
    ```bash
    $ sudo ifconfig lo0 alias 192.168.111.111
    ```
@@ -186,8 +176,7 @@ $ docker-compose stop
    6. Click 'OK'
 4. Run the docker deployment (build & start the containers)
    1. Select "Docker Deployment" from the runtime configurations list in the toolbar
-   2. Click the run button.
-   
+   2. Click the run button.  
    This will open the 'Docker' tool window.  You can see the deployed containers and their logs here.  You can also stop/restart/redeploy the Docker containers here.  For example, after changing the Gemfile, you would want to click the 'Compose: docker-compose.yml' node and click the 'Redeploy' button on the left in order to rebuild the gems and restart the containers.
 5. Add a remote Ruby SDK in Settings > Languages & Frameworks > Ruby SDK and Gems by clicking the '+' button and selecting 'New remote...'
    1. Select 'Docker' as the Remote Ruby Interpreter type
