@@ -92,14 +92,21 @@ This template is based on the tutorial [Quickstart: Compose and Rails](https://d
 
 1. Copy docker-compose.yml and Dockerfile over from template to your project.
 2. Change the Dockerfile ruby version as desired.
-3. Change the docker-compose.yml `environment` settings `MYSQL_*` to your desired values. Note that the `MYSQL_DATABASE` database will be created when the db image is first built.
-4. Run the following command to rebuild the image with the new gems.  You should re-run this command any time you change the Gemfile.
+3. OPTIONALLY, if you have any unbundled gems located in directories within your rails app, then you will need to be sure to add some `ADD` statements to the Dockerfile so that these unbundled gems will be available when the Dockerfile runs `bundle install`.  These `ADD` statements should precede the `bundle install` line like below:
+
+   ```
+   ADD lib/inmar /myapp/lib/inmar
+   ADD lib/you /myapp/lib/you
+   RUN bundle install
+   ```
+4. Change the docker-compose.yml `environment` settings `MYSQL_*` to your desired values. Note that the `MYSQL_DATABASE` database will be created when the db image is first built.
+5. Run the following command to rebuild the image with the new gems.  You should re-run this command any time you change the Gemfile.
    
    ```bash
    $ docker-compose build
    ```
-5. Modify existing config/database.yml changing the 'host' values to "db" (the name of the docker-compose db service)
-6. Add rails user and grant them access to the development and test databases:
+6. Modify existing config/database.yml changing the 'host' values to "db" (the name of the docker-compose db service)
+7. Add rails user and grant them access to the development and test databases:
 
    ```bash
    $ docker-compose run --rm db mysql -h db -u root -p
@@ -115,7 +122,7 @@ This template is based on the tutorial [Quickstart: Compose and Rails](https://d
    
    mysql> exit
    ```
-7. Create the development and test databases:
+8. Create the development and test databases:
 
    ```bash
    $ docker-compose run --rm web bundle exec rake db:create
@@ -125,7 +132,7 @@ This template is based on the tutorial [Quickstart: Compose and Rails](https://d
    ```bash
    $ docker-compose run --rm web bundle exec rake db:setup
    ```
-8. Copy database data from your old db to the new docker db.
+9. Copy database data from your old db to the new docker db.
    1. Create an mysql dump of your database from your old mysql instance (alternatively, Sequel Pro can do this).  The dump file should be in SQL format and contain both schema and content.
       
       ```bash
@@ -145,13 +152,13 @@ This template is based on the tutorial [Quickstart: Compose and Rails](https://d
       ```
       Note that the password must be specified in the command since the dump.sql file is being redirected to stdin for the import.
 
-9. Verify that database looks good from rails console:
+10. Verify that database looks good from rails console:
 
     ```bash
     $ docker-compose run --rm web rails c
     ```
 
-10. Start the rails app:
+11. Start the rails app:
 
     ```bash
     $ docker-compose up
@@ -346,13 +353,53 @@ In order to make this change permanent, we will actually just be setting up a la
    ```bash
    $ docker-compose stop
    ```
-5. Add a remote Ruby SDK in Settings > Languages & Frameworks > Ruby SDK and Gems by clicking the '+' button and selecting 'New remote...'
-   1. Select 'Docker' as the Remote Ruby Interpreter type
-   2. Select the 'Server' name that you created in step 2 (probably "Docker")
-   3. Select the 'Image name' that was created by running the deployment in step 4. This image will default to the name of the rails project directory (without spaces) with the docker-compose service name ("web") appended after an "_" then followed by a ":latest". (eg: "testrails_web:latest").
-   4. You should be able to leave the 'Ruby interpreter path' as its default "ruby"
-   5. Click 'OK' then wait a few secs as RubyMine connects to the container and retrieves the list of deployed gems.
-6. Configure the RubyMine database client to connect to the db service container:
+5. Add a remote Ruby SDK for the docker container
+
+   RubyMine will download all the rubygems from the docker container into a local cache after the ruby SDK is added.  This cache is used for code introspection, db column introspection, etc.  It is also used to determine that certain gems are installed before performing certain tasks like running the rails server from the RubyMine run/debug configurations.  However, when copying the gem directories and file to the local cache, RubyMine skips any gems that have empty directories.  This sounds reasonable, except that certain critical gems ACTUALLY DO have empty gem directories.  Specifically, certain versions of the rails gem (like rails-3.2.21) has an empty gem directory.  This causes RubyMine to refuse to run/debug the Rails server with an error message about the rails gem missing.  To work around this issue, be sure to insert an empty file into the blank rails gem directory in the container by adding a line like the `touch` RUN command below.  It should be placed AFTER the `bundle install` and BEFORE the `VOLUME /usr/local/bundle` lines of the Dockerfile:
+   
+   ```
+   RUN bundle install
+   RUN touch /usr/local/bundle/gems/rails-3.2.21/.keep
+   VOLUME /usr/local/bundle
+   ```
+   
+   1. Go to Settings > Languages & Frameworks > Ruby SDK and Gems then click the '+' button and select 'New remote...'
+   2. Select 'Docker' as the Remote Ruby Interpreter type
+   3. Select the 'Server' docker deployment name that you created in step 2 (probably "Docker")
+   4. Select the 'Image name' that was created by running the deployment in step 4. This image will default to the name of the rails project directory (without spaces) with the docker-compose service name ("web") appended after an "_" then followed by a ":latest". (eg: "testrails_web:latest").
+   5. You should be able to leave the 'Ruby interpreter path' as its default "ruby"
+   6. Click 'OK' then wait a few secs as RubyMine connects to the container and retrieves the list of deployed gems (creates local cache).
+   7. Click the 'Edit Path Mappings' button (icon button found above list of ruby SDKs) and add a mapping that associates the Rails project directory on your laptop to the `/myapp` directory in the container.  This is required for certain internal RubyMine tools to work correctly (like scanning the names of rake tasks, generators, etc.)
+6. Update the Rails run/debug configurations
+   1. Open each Rails run/debug configuration by first selecting 'Edit Configurations...' from the run/debug configurations drop-down in the RubyMine toolbar.
+   2. Select a Rails configuration
+   3. Click the Add button '+' below the 'Before launch: Activiate tool window' section in the right pane.  Select 'Run External tool' from the drop-down.
+   4. In the 'External Tools' window, click the Add button '+' to open the 'Create Tool' window.
+   5. In the 'Create Tool' window, enter the following info leaving all other defaults:
+
+      | field | value |
+      |-------|-------|
+      | Name: | Start db |
+      | Program: | docker-compose |
+      | Parameters: | start db |
+      ...then click 'OK'
+   6. Now back in the 'External Tools' window, click the Add button '+' again to open the 'Create Tool' window.
+   7. This time, in the 'Create Tool' window, enter the following info:
+
+      | field | value |
+      |-------|-------|
+      | Name: | Stop web |
+      | Program: | docker-compose |
+      | Parameters: | stop web |
+      ...then click 'OK'
+   8. Click 'OK' to dismiss the 'External Tools' window then click 'OK' to dismiss the 'Run/Debug Configurations' window.
+   
+   When adding these 'before launch' tasks to subsequent rails run/debug configurations, you can re-use the 2 tasks that you added by simply clicking to select one and hitting 'OK' in the 'External Tools' window.
+   
+   These 'before launch' tasks will make sure that the db is running and any web container is stopped whenever you 'run' the rails server.
+   
+   You could also simply do these tasks manually in the terminal before running the rails instance if you wanted to.  But, I'm generally to lazy to try to remember to do all that.
+7. Configure the RubyMine database client to connect to the db service container:
 
    This is essentially the 100% standard RubyMine technique for setting up the data sources for the integrated Database client.  The database client not only provides a very helpful tool for interacting with the database, but it also helps you configure rubymine to be able to interact with the database directly in order to provide code completion and other introspections.
    
@@ -361,3 +408,54 @@ In order to make this change permanent, we will actually just be setting up a la
    3. Then in the 'Data Sources and Drivers' window that pops up, check to see if a "Download missing driver files" warning is displayed at the bottom.  If it is then this is the first time that you have created a connection to the current type of database (eg: mysql).  Simply click the 'Download' link and RubyMine will take care of the rest.
    4. Add your your password and click the 'Remember password' checkbox on the right.
    5. Click 'Test Connection' to verify that it can connect to the database.  If successful then you are done!
+
+## General RubyMine Workflow
+
+#### Preparing to Open Project
+
+Before launching RubyMine and/or opening your project, you probably want to check to see if any other docker containers are running which may have conflicting ports (db: 3306, web: 3000).  This can be determined by executing the following command which displays all the running docker containers (not just current project containers):
+
+```bash
+$ docker ps
+
+$ docker ps
+CONTAINER ID        IMAGE                         COMMAND                  CREATED             STATUS              PORTS                                             NAMES
+1b1213e49179        coredynamicemail_web:latest   "ruby -e $stdout.s..."   4 minutes ago       Up 4 minutes        0.0.0.0:3000->3000/tcp                            practical_meitner
+9465f4000ef2        mysql:5.5                     "docker-entrypoint..."   2 hours ago         Up 8 minutes        0.0.0.0:3306->3306/tcp, 0.0.0.0:32788->3306/tcp   coredynamicemail_db_1
+```
+
+If any of the docker containers listed are NOT for the current project then you can shut them down if they have conflicting ports by going to that other project's dir and doing a `docker-compose stop` or by issuing direct container stop commands via docker using the CONTAINER ID (first column of output) like `docker stop 1b1213e49179`.
+
+### Opening Project
+
+If you are opening the project for the first time then you will need to deploy the project (docker build) via the 'Docker Deployment' run/debug configuration that you created in the 'RubyMine Setup' instructions earlier.  This is done by selecting 'Docker Deployment' from the run/debug configurations drop-down in the RubyMine toolbar then clicking the 'Run' (green triangle icon) button.  This will build/rebuild and launch the project's containers.
+
+If the project's containers are already up to date and the docker containers built (but not necessarily running) then you can skip this step.
+
+### Rake Tasks and Rails Generators
+
+These can be ran in the normal fashion via the rake popup (option+r) and the generator popup (option+g).
+
+### Run the Rails Server
+
+Simply select the desired rails run/debug configuration from the drop-down in the toolbar then hit the 'Run' button (green triangle icon).  This will open up the console output and rails log tabs in the 'Run' tool window at the bottom.
+
+### Bundle Install
+
+Whenever you make changes to the Gemfile, you should rebuild the docker image which in turn runs `bundle install`.  This can be accomplished as follows:
+
+1. Displaying the 'Docker' tool window by clicking the 'Docker' tool button at the botton of the RubyMine window.
+2. Select the "Compose: docker-compose.yml" node at the top.
+3. Click the 'Redeploy' button in the toolbar on the left.
+
+This will rebuild the web container from the Dockerfile reinstalling the gems.
+
+### Closing Project
+
+Simply manually stop the db and web containers with:
+
+```bash
+$ docker-compose stop
+```
+
+...no use leaving them running.
