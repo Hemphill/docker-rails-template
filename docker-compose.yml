@@ -2,7 +2,7 @@ version: '2'
 
 services:
   db:
-    image: mysql:5.5
+    image: mysql:8.0.3
     ports:
       - "3306:3306"
       - "3306"
